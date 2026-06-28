@@ -1,5 +1,19 @@
 # Generic Chat Agent - LangChain Implementation
 
+![Featured Image](./imgs/featured.png)
+
+<div align="center">
+
+![Python](imgs/badges/python.svg)
+![FastAPI](imgs/badges/fastapi.svg)
+![LangChain](imgs/badges/langchain.svg)
+![WebSocket](imgs/badges/websocket.svg)
+![OpenAI](imgs/badges/openai.svg)
+![SQLite](imgs/badges/sqlite.svg)
+![Streaming](imgs/badges/streaming.svg)
+
+</div>
+
 A production-ready generic chat agent built with LangChain, featuring WebSocket streaming, conversation memory, and multi-format document support.
 
 ## Features
