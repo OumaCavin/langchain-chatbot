@@ -102,16 +102,24 @@ PORT=8000
 DEBUG=false
 ```
 
-## API Endpoints
+## API Documentation
+
+All API endpoints are prefixed with `/api/v1`. Full Swagger/OpenAPI documentation available at `/docs` when the server is running.
+
+### Authentication
+
+The API supports two authentication methods:
+- **X-API-Key Header**: Pass your API key in the `X-API-Key` header
+- **Bearer Token**: Use JWT tokens obtained from `/api/v1/auth/login`
 
 ### WebSocket Chat
 
-**Endpoint**: `ws://host:port/generic-chat/ws`
+**Endpoint**: `ws://host:port/api/v1/ws/chat`
 
 Connect to receive real-time streaming responses:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/generic-chat/ws');
+const ws = new WebSocket('ws://localhost:8000/api/v1/ws/chat?api_key=YOUR_KEY');
 
 ws.onopen = () => {
     ws.send(JSON.stringify({
@@ -130,32 +138,132 @@ ws.onmessage = (event) => {
 
 ### REST Chat
 
-**Endpoint**: `POST /generic-chat/chat`
+**Endpoint**: `POST /api/v1/chat`
 
 ```bash
-curl -X POST http://localhost:8000/generic-chat/chat \
+curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
   -d '{"message": "Hello, how are you?"}'
 ```
 
-### File Upload
+**Request Headers**:
+- `X-API-Key`: Your API key (required)
+- `X-Provider`: AI provider - "openai" or "google" (default: openai)
+- `X-Model`: Model name (default: gpt-4o-mini)
+- `X-Base-URL`: Custom API base URL (optional)
+- `X-System-Prompt`: Custom system prompt (optional)
+- `X-Session-ID`: Session ID for conversation continuity (optional)
+- `Authorization`: Bearer token (alternative to X-API-Key)
 
-**Endpoint**: `POST /generic-chat/upload/document`
+### Multi-File Upload
+
+**Endpoint**: `POST /api/v1/upload/documents`
+
+Upload multiple files (PDF, TXT, DOCX) for context:
 
 ```bash
-curl -X POST http://localhost:8000/generic-chat/upload/document \
-  -F "file=@document.pdf"
+curl -X POST http://localhost:8000/api/v1/upload/documents \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -F "files=@document1.pdf" \
+  -F "files=@document2.txt"
+```
+
+### Search Conversations
+
+**Endpoint**: `POST /api/v1/search`
+
+Search through conversation history:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/search \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "search term", "limit": 10}'
+```
+
+### Export Conversations
+
+**Endpoints**:
+- `GET /api/v1/export/{session_id}/json`
+- `GET /api/v1/export/{session_id}/text`
+
+```bash
+# JSON export
+curl -X GET http://localhost:8000/api/v1/export/session123/json \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -o conversation.json
+
+# Text export
+curl -X GET http://localhost:8000/api/v1/export/session123/text \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -o conversation.txt
+```
+
+### System Prompts Management
+
+**Endpoints**:
+- `GET /api/v1/prompts` - List all prompts
+- `POST /api/v1/prompts` - Create new prompt
+- `DELETE /api/v1/prompts/{prompt_id}` - Delete prompt
+
+```bash
+# Create prompt
+curl -X POST http://localhost:8000/api/v1/prompts \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Code Assistant", "content": "You are an expert programmer..."}'
+```
+
+### User Authentication
+
+**Endpoints**:
+- `POST /api/v1/auth/register` - Register new user
+- `POST /api/v1/auth/login` - Login and get JWT token
+
+```bash
+# Register
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123"}'
+
+# Login
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user@example.com", "password": "password123"}'
 ```
 
 ### Session Management
 
-- `GET /generic-chat/sessions` - List all sessions
-- `GET /generic-chat/session/{session_id}` - Get session info
-- `DELETE /generic-chat/session/{session_id}` - Delete session
+- `GET /api/v1/sessions` - List all sessions
+- `GET /api/v1/sessions/{session_id}` - Get session info
+- `GET /api/v1/sessions/{session_id}/messages` - Get session messages
+- `DELETE /api/v1/sessions/{session_id}` - Delete session
+- `PATCH /api/v1/sessions/{session_id}` - Update session
 
 ### Health Check
 
-**Endpoint**: `GET /generic-chat/health`
+**Endpoint**: `GET /api/v1/health`
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+### Error Responses
+
+All endpoints return standard HTTP status codes:
+- `200`: Success
+- `400`: Bad Request
+- `401`: Unauthorized
+- `404`: Not Found
+- `500`: Internal Server Error
+
+Error responses include a JSON body:
+```json
+{
+    "detail": "Error message description"
+}
+```
 
 ## Development
 
