@@ -220,6 +220,27 @@ async def login_user(credentials: UserLogin):
 
 # ============ Chat Endpoints ============
 
+def _build_document_context(db, session_id: str) -> Optional[str]:
+    """
+    Build document context from uploaded files for a session.
+
+    This enables the Stateless Document-Aware AI Assistant architecture
+    by injecting uploaded document content into LLM context.
+    """
+    try:
+        files = db.get_session_files(session_id)
+        if not files:
+            return None
+
+        doc_context = "=== UPLOADED DOCUMENTS ===\n\n"
+        for f in files:
+            doc_context += f"--- {f.filename} ---\n{f.content[:10000]}\n\n"
+
+        return doc_context
+    except Exception:
+        return None
+
+
 @router.websocket("/ws/chat")
 async def websocket_chat(
     websocket: WebSocket,
@@ -227,7 +248,7 @@ async def websocket_chat(
     system_prompt: Optional[str] = None,
     api_key: Optional[str] = None,
 ):
-    """WebSocket endpoint for streaming chat with conversation memory."""
+    """WebSocket endpoint for streaming chat with conversation memory and document awareness."""
     db = get_database()
 
     if session_id:
@@ -284,6 +305,15 @@ async def websocket_chat(
                     # Get session system prompt if not provided
                     session = db.get_session(session_id)
                     effective_prompt = system_prompt or (session.system_prompt if session else None)
+
+                    # Inject document context for Document-Aware AI Assistant
+                    doc_context = _build_document_context(db, session_id)
+                    if doc_context:
+                        doc_instruction = "\n\nUse the above uploaded documents to answer user questions. If the user asks about content in the documents, reference them directly."
+                        if effective_prompt:
+                            effective_prompt = effective_prompt + doc_instruction + "\n\n" + doc_context
+                        else:
+                            effective_prompt = "You are a helpful AI assistant." + doc_instruction + "\n\n" + doc_context
 
                     agent = _get_or_create_agent(api_key)
                     response_text = ""
@@ -358,9 +388,10 @@ async def chat_direct(
     api_key: Optional[str] = Header(None),
 ):
     """
-    Direct chat endpoint with conversation memory.
+    Direct chat endpoint with conversation memory and document awareness.
 
     Supports both JSON body and query parameters for flexibility.
+    Automatically injects uploaded document content into LLM context.
     """
     if message is None and request is None:
         raise HTTPException(
@@ -402,6 +433,15 @@ async def chat_direct(
             session = db.get_session(session_id)
             if session and session.system_prompt:
                 system_prompt = session.system_prompt
+
+        # Inject document context for Document-Aware AI Assistant
+        doc_context = _build_document_context(db, session_id)
+        if doc_context:
+            doc_instruction = "\n\nUse the above uploaded documents to answer user questions. If the user asks about content in the documents, reference them directly."
+            if system_prompt:
+                system_prompt = system_prompt + doc_instruction + "\n\n" + doc_context
+            else:
+                system_prompt = "You are a helpful AI assistant." + doc_instruction + "\n\n" + doc_context
 
         response_text = await agent.chat(content, system_prompt, history=context)
 

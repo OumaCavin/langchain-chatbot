@@ -1,4 +1,4 @@
-# Generic Chat Agent - LangChain Implementation
+# Stateless Document-Aware AI Assistant - LangChain Implementation
 
 ![Featured Image](./imgs/featured.png)
 
@@ -14,15 +14,18 @@
 
 </div>
 
-A production-ready generic chat agent built with LangChain, featuring WebSocket streaming, conversation memory, and multi-format document support.
+A **production-ready Stateless Document-Aware AI Assistant** built with LangChain, featuring WebSocket streaming, conversation memory, user authentication, search, export, and multi-format document support. Documents are ingested via REST API and their content is automatically injected into LLM context for intelligent document-aware responses.
 
 ## Features
 
-- **Generic Chat Agent**: AI-powered conversational interface with streaming responses
-- **WebSocket Support**: Real-time token-by-token streaming for enhanced user experience
-- **PDF File Upload**: Upload and extract text from PDF documents with progress tracking
+- **Stateless Document-Aware Architecture**: Upload documents via REST API, content automatically injected into LLM context
+- **WebSocket Streaming**: Real-time token-by-token streaming for enhanced user experience
+- **Multi-File Upload**: Upload PDF, TXT, MD, and DOCX files with automatic text extraction
 - **Conversation Memory**: SQLite-based persistent storage for conversation history
-- **Multi-Format Support**: Process PDF, TXT, MD, and DOCX files
+- **User Authentication**: JWT-based authentication with API keys
+- **Chat History Search**: Full-text search across all conversations
+- **Conversation Export**: Export sessions as JSON or plain text
+- **Custom System Prompts**: Create and manage AI behavior presets
 - **OpenAI & Gemini Support**: Works with both OpenAI GPT and Google Gemini models
 - **Clean Architecture**: Modular design with separation of concerns
 
@@ -43,6 +46,40 @@ langchain-chatbot/
 ├── requirements.txt     # Python dependencies
 └── .env.example         # Environment variables template
 ```
+
+## Stateless Document-Aware AI Architecture
+
+The system implements a **Stateless Document-Aware AI Assistant** architecture where:
+
+### Document Ingestion Flow (REST API)
+
+```
+1. User uploads documents via POST /api/v1/upload/documents
+2. FileProcessor extracts text from PDF/TXT/MD/DOCX
+3. Document content stored in SQLite via db.add_file()
+4. System message added: "[Document: filename - N characters extracted]"
+```
+
+### Document Context Injection Flow (Chat)
+
+```
+1. User sends message via WebSocket or REST Chat API
+2. System retrieves conversation history via db.get_conversation_context()
+3. System retrieves uploaded file content via db.get_session_files()
+4. Document content injected into system prompt:
+   "=== UPLOADED DOCUMENTS ==="
+   "--- filename.ext ---"
+   "{document content}"
+5. LLM generates response with document context
+6. Response streamed token-by-token to client
+```
+
+### Key Benefits
+
+- **Stateless**: Each request is self-contained with all necessary context
+- **Document-Aware**: Uploaded files are automatically available to the AI
+- **Memory Efficient**: No server-side session state; all context in request
+- **Scalable**: Can run on serverless platforms without sticky sessions
 
 ## Installation
 
