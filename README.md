@@ -317,6 +317,59 @@ pytest tests/
 - `generic_agent/database.py`: SQLite storage for conversations
 - `generic_agent/file_processor.py`: Document text extraction
 
+## Deployment
+
+The LangChain chatbot can be deployed using various methods:
+
+### Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/OumaCavin/langchain-chatbot.git
+cd langchain-chatbot
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure
+cp .env.example .env
+# Edit .env with your OPENAI_API_KEY
+
+# Run
+python main.py
+# Or with uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Docker Deployment
+
+```bash
+docker build -t langchain-chatbot .
+docker run -d -p 8000:8000 -e OPENAI_API_KEY=your_key langchain-chatbot
+```
+
+### Cloud Platforms
+
+The application supports deployment to:
+- Railway
+- Render
+- Fly.io
+- AWS (Elastic Beanstalk, ECS, Lambda)
+- Google Cloud (Cloud Run, App Engine)
+
+See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
+
+### Common Issues
+
+**Chatbot Not Responding Properly**
+
+If the chatbot returns empty responses, ensure:
+1. OPENAI_API_KEY is set correctly in .env
+2. The LangChain chain is properly initialized
+3. Chat history is being passed to the chain
+
+Debug with: `DEBUG=true LOG_LEVEL=DEBUG uvicorn main:app --reload`
+
 ## License
 
 MIT License

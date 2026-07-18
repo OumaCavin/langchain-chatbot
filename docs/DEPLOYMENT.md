@@ -1,6 +1,10 @@
 # Deployment Guide
 
-This guide covers deploying the LangChain Chatbot to various platforms.
+**Author:** Cavin Otieno
+**Version:** 2.0.0
+**Last Updated:** 2024-07-19
+
+This guide covers deploying the LangChain Chatbot to various platforms. The LangChain chatbot is a production-ready Stateless Document-Aware AI Assistant built with LangChain, featuring WebSocket streaming, conversation memory, user authentication, search, export, and multi-format document support.
 
 ## Table of Contents
 
@@ -578,8 +582,270 @@ sqlite3 data/chatbot.db ".restore data/backup_20240101.db"
 
 ---
 
+## Troubleshooting
+
+This section covers common issues and their solutions when deploying and running the LangChain Chatbot.
+
+### Common Issues and Solutions
+
+#### Issue: Chatbot Not Responding Properly
+
+**Symptom:** The chatbot returns empty responses or does not generate proper AI responses.
+
+**Root Cause:** The LLM may not be properly initialized or the message context is not being passed correctly to the LangChain chain.
+
+**Solution:** Verify that the LangChain chain is properly configured:
+
+1. Check that OPENAI_API_KEY is set correctly in your .env file
+2. Ensure the chat history is being passed to the chain
+3. Verify that the ChatOpenAI model is properly initialized
+
+**Debug Steps:**
+
+```bash
+# Enable debug mode to see detailed logs
+DEBUG=true LOG_LEVEL=DEBUG uvicorn main:app --reload
+
+# Test direct LLM call
+python -c "
+from langchain_openai import ChatOpenAI
+import os
+llm = ChatOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+print(llm.invoke('Hello'))
+"
+```
+
+**Code Verification:** Check that the LangChain chain is properly configured in agent.py:
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain.chains import LLMChain
+from langchain.prompts import ChatPromptTemplate
+
+# Initialize LLM
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0.7,
+    api_key=api_key
+)
+
+# Create chain with prompt
+prompt = ChatPromptTemplate.from_messages([...])
+chain = LLMChain(llm=llm, prompt=prompt)
+```
+
+#### Issue: Module 'langchain' Not Found
+
+**Symptom:** ImportError when running the application.
+
+**Solution:**
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Reinstall dependencies
+pip install -r requirements.txt
+
+# Verify langchain installation
+pip show langchain-openai
+```
+
+#### Issue: WebSocket Connection Failed
+
+**Symptom:** Cannot connect to WebSocket endpoint or connection drops immediately.
+
+**Solution:**
+
+1. Check that the server is running:
+   ```bash
+   curl http://localhost:8000/api/v1/health
+   ```
+
+2. Verify firewall settings:
+   ```bash
+   sudo ufw allow 8000
+   ```
+
+3. For Nginx reverse proxy, ensure WebSocket support is enabled:
+   ```nginx
+   location / {
+       proxy_pass http://127.0.0.1:8000;
+       proxy_http_version 1.1;
+       proxy_set_header Upgrade $http_upgrade;
+       proxy_set_header Connection "upgrade";
+   }
+   ```
+
+#### Issue: OpenAI API Errors
+
+**Symptom:** API errors such as "Invalid API Key" or "Rate limit exceeded".
+
+**Solution:**
+
+1. Verify your API key starts with "sk-":
+   ```bash
+   grep OPENAI_API_KEY .env
+   ```
+
+2. Check that the model name is correct:
+   ```env
+   OPENAI_MODEL_NAME=gpt-4o-mini
+   ```
+
+3. Check rate limits and implement backoff:
+   ```python
+   from tenacity import retry, wait_exponential
+
+   @retry(wait=wait_exponential(multiplier=1, min=2, max=10))
+   async def call_llm_with_retry(messages):
+       return await llm.ainvoke(messages)
+   ```
+
+4. Ensure you have API credits:
+   - Log into OpenAI dashboard
+   - Check your usage and billing
+
+#### Issue: File Upload Fails
+
+**Symptom:** PDF or document uploads return errors.
+
+**Solution:**
+
+1. Check directory permissions:
+   ```bash
+   ls -la data/
+   chmod 755 data/
+   ```
+
+2. Verify file size is within limits (default: 10MB)
+
+3. Check file format is supported (PDF, TXT, MD, DOCX)
+
+4. Verify file processor is working:
+   ```python
+   from generic_agent.file_processor import FileProcessor
+   processor = FileProcessor()
+   content = processor.extract_text("document.pdf")
+   ```
+
+#### Issue: CORS Policy Errors
+
+**Symptom:** Browser blocks requests with CORS error.
+
+**Solution:** Configure allowed origins in main.py:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://your-frontend.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+#### Issue: Database Locked
+
+**Symptom:** SQLite database errors during concurrent access.
+
+**Solution:**
+
+1. Use WAL mode for better concurrency:
+   ```python
+   conn.execute("PRAGMA journal_mode=WAL")
+   ```
+
+2. Set an appropriate busy timeout:
+   ```python
+   conn.execute("PRAGMA busy_timeout=5000")
+   ```
+
+3. For production, consider using PostgreSQL
+
+#### Issue: Streaming Not Working
+
+**Symptom:** Responses are not streamed token-by-token.
+
+**Solution:**
+
+1. Verify streaming is enabled in LangChain:
+   ```python
+   llm = ChatOpenAI(
+       model="gpt-4o-mini",
+       streaming=True,
+       callbacks=[StreamingStdOutCallbackHandler()]
+   )
+   ```
+
+2. Check WebSocket is properly configured for streaming
+
+3. Ensure async generator is used for streaming responses
+
+### Logging and Debugging
+
+**Enable Debug Mode:**
+
+```bash
+DEBUG=true LOG_LEVEL=DEBUG uvicorn main:app --reload
+```
+
+**Check Application Logs:**
+
+```bash
+# If running with systemd
+sudo journalctl -u langchain-chatbot -f
+
+# If running with Docker
+docker logs -f langchain-chatbot
+```
+
+**Test API Endpoints:**
+
+```bash
+# Health check
+curl http://localhost:8000/api/v1/health
+
+# Test chat
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"message": "Hello", "session_id": "test-001"}'
+```
+
+### Performance Optimization
+
+**Connection Pooling:**
+
+```python
+from langchain_openai import ChatOpenAI
+
+# Reuse LLM instance
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    max_retries=3,
+    timeout=60
+)
+```
+
+**Caching Responses:**
+
+```python
+from langchain.cache import InMemoryCache
+import langchain
+
+langchain.llm_cache = InMemoryCache()
+```
+
+---
+
 ## Support
 
 For deployment help:
 - GitHub Issues: [Create Issue](https://github.com/OumaCavin/langchain-chatbot/issues)
 - Documentation: [docs/](docs/)
+- Email: cavin.otieno012@gmail.com
+
+## License
+
+MIT License - Developed by Cavin Otieno
